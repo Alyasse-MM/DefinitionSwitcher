@@ -1,5 +1,5 @@
 # ---------------------------------------------------------
-# 1. WINDOWS API BRIDGE (RESOLUTION & CURSORS)
+# 1. WINDOWS API BRIDGE (C#)
 # ---------------------------------------------------------
 
 $csharpSource = @"
@@ -10,12 +10,16 @@ public class ScreenHelper {
     [DllImport("user32.dll")]
     public static extern int ChangeDisplaySettings(ref DEVMODE devMode, int flags);
 
+    [DllImport("user32.dll")]
+    public static extern bool EnumDisplaySettings(string deviceName, int modeNum, ref DEVMODE devMode);
+
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool SystemParametersInfo(int uAction, int uParam, IntPtr lpvParam, int fuWinIni);
 
     public const int SPI_SETCURSORS = 0x0057;
     public const int SPIF_UPDATEINIFILE = 0x01;
     public const int SPIF_SENDCHANGE = 0x02;
+    public const int ENUM_CURRENT_SETTINGS = -1;
 
     [StructLayout(LayoutKind.Sequential)]
     public struct DEVMODE {
@@ -45,19 +49,23 @@ public class ScreenHelper {
         public int dmDisplayFrequency;
     }
 
-    public static void ReloadCursors() {
-        SystemParametersInfo(SPI_SETCURSORS, 0, IntPtr.Zero, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE);
-    }
-
-    public static void SetDefinition(int width, int height) {
+    // 1. Set Resolution & Fix Cursor
+    public static void Set(int width, int height) {
         DEVMODE dm = new DEVMODE();
         dm.dmSize = (short)Marshal.SizeOf(dm);
         dm.dmPelsWidth = width;
         dm.dmPelsHeight = height;
         dm.dmFields = 0x80000 | 0x100000; 
-        
         ChangeDisplaySettings(ref dm, 0); 
-        ReloadCursors();
+        SystemParametersInfo(SPI_SETCURSORS, 0, IntPtr.Zero, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE);
+    }
+
+    // 2. Check if current resolution matches target
+    public static bool Is(int width, int height) {
+       DEVMODE dm = new DEVMODE();
+       dm.dmSize = (short)Marshal.SizeOf(dm);
+       EnumDisplaySettings(null, ENUM_CURRENT_SETTINGS, ref dm);
+       return (dm.dmPelsWidth == width && dm.dmPelsHeight == height);
     }
 }
 "@
@@ -72,11 +80,9 @@ if (-not ("ScreenHelper" -as [type])) {
 
 $SteamExePath = "D:\Programmes\Steam\steam.exe"
 
-# TV / Gaming Resolution
 $HighResX = 2880
 $HighResY = 1620
 
-# Desktop / Work Resolution
 $NormalResX = 1920
 $NormalResY = 1080
 
@@ -87,54 +93,50 @@ $NormalResY = 1080
 $MutexName = "Global\DefinitionSwitcher"
 $CreatedNew = $false
 try {
-    # Keep Mutex alive in Global scope to prevent Garbage Collection
     $Global:AppMutex = New-Object System.Threading.Mutex($true, $MutexName, [ref]$CreatedNew)
 } catch {
     $CreatedNew = $false
 }
 
 if (-not $CreatedNew) {
-    # If already running, just bring Steam to front
-    Start-Process "steam://open/bigpicture"
+    Start-Process "steam://open/main"
     exit
 }
 
 # ---------------------------------------------------------
-# 4. START SESSION (SWITCH TO 4K)
+# 4. START SESSION
 # ---------------------------------------------------------
 
-# 1. Switch to High Res immediately (Before Steam / Games load)
-[ScreenHelper]::SetDefinition($HighResX, $HighResY)
+[ScreenHelper]::Set($HighResX, $HighResY)
 
-# 2. Launch Steam (if not running)
 $SteamProcess = Get-Process -Name "steam" -ErrorAction SilentlyContinue
 if ($null -eq $SteamProcess) {
-    # Launch in Big Picture Mode (Great for TV/High Res)
-    Start-Process -FilePath $SteamExePath -ArgumentList "-bigpicture"
+    Start-Process -FilePath $SteamExePath
     Start-Sleep -Seconds 10
 } else {
-    # If Steam is already running, force it into Big Picture to match the new 4K res
-    Start-Process "steam://open/bigpicture"
+    Start-Process "steam://open/main"
 }
 
 # ---------------------------------------------------------
-# 5. WAIT FOR SESSION TO END
+# 5. ENFORCER LOOP
 # ---------------------------------------------------------
 
 while ($true) {
     $SteamProcess = Get-Process -Name "steam" -ErrorAction SilentlyContinue
     
-    # If Steam closes, we end the session
     if ($null -eq $SteamProcess) {
         break 
     }
 
-    # Low CPU usage wait
-    Start-Sleep -Seconds 3
+    if (-not [ScreenHelper]::Is($HighResX, $HighResY)) {
+        [ScreenHelper]::Set($HighResX, $HighResY)
+    }
+
+    Start-Sleep -Seconds 2
 }
 
 # ---------------------------------------------------------
-# 6. CLEANUP (SWITCH TO 1080p)
+# 6. CLEANUP
 # ---------------------------------------------------------
 
-[ScreenHelper]::SetDefinition($NormalResX, $NormalResY)
+[ScreenHelper]::Set($NormalResX, $NormalResY)
