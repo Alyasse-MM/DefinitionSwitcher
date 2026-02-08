@@ -88,7 +88,7 @@ $NormalResY = 1080
 $MutexName = "Global\DefinitionSwitcher"
 $CreatedNew = $false
 try {
-    $null =New-Object System.Threading.Mutex($true, $MutexName, [ref]$CreatedNew)
+    $Global:DefinitionSwitcherMutex = New-Object System.Threading.Mutex($true, $MutexName, [ref]$CreatedNew)
 } catch {
     $CreatedNew = $false
 }

@@ -33,7 +33,7 @@ task build {
     $OutputFile = "$($DefinitionSwitcher.BuildDir)\$($DefinitionSwitcher.AppName).exe"
 
     Invoke-PS2EXE `
-        -InputFile "$PSScriptRoot\src\DefinitionSwitcher.ps1" `
+        -InputFile "$PSScriptRoot\DefinitionSwitcher.ps1" `
         -OutputFile $OutputFile `
         -noConsole `
         -ErrorAction Stop
