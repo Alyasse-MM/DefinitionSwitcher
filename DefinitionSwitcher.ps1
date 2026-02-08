@@ -1,16 +1,15 @@
 # ---------------------------------------------------------
-# WINDOWS API BRIDGE (C#)
+# 1. WINDOWS API BRIDGE (RESOLUTION & CURSORS)
 # ---------------------------------------------------------
+
 $csharpSource = @"
 using System;
 using System.Runtime.InteropServices;
 
 public class ScreenHelper {
-    // 1. Import for changing resolution
     [DllImport("user32.dll")]
     public static extern int ChangeDisplaySettings(ref DEVMODE devMode, int flags);
 
-    // 2. Import for refreshing the mouse cursor
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool SystemParametersInfo(int uAction, int uParam, IntPtr lpvParam, int fuWinIni);
 
@@ -46,7 +45,6 @@ public class ScreenHelper {
         public int dmDisplayFrequency;
     }
 
-    // Helper to reload cursors fixes the pixelated mouse glitch
     public static void ReloadCursors() {
         SystemParametersInfo(SPI_SETCURSORS, 0, IntPtr.Zero, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE);
     }
@@ -56,12 +54,9 @@ public class ScreenHelper {
         dm.dmSize = (short)Marshal.SizeOf(dm);
         dm.dmPelsWidth = width;
         dm.dmPelsHeight = height;
-        dm.dmFields = 0x80000 | 0x100000; // DM_PELSWIDTH | DM_PELSHEIGHT
+        dm.dmFields = 0x80000 | 0x100000; 
         
-        // 1. Change Resolution
         ChangeDisplaySettings(ref dm, 0); 
-
-        // 2. Fix the Mouse Cursor immediately
         ReloadCursors();
     }
 }
@@ -72,73 +67,74 @@ if (-not ("ScreenHelper" -as [type])) {
 }
 
 # ---------------------------------------------------------
-# CONFIGURATION
+# 2. CONFIGURATION
 # ---------------------------------------------------------
-$SteamCommonPath = "D:\Programmes\Steam\steamapps\common\"
+
 $SteamExePath = "D:\Programmes\Steam\steam.exe"
 
+# TV / Gaming Resolution
 $HighResX = 2880
 $HighResY = 1620
+
+# Desktop / Work Resolution
 $NormalResX = 1920
 $NormalResY = 1080
 
 # ---------------------------------------------------------
-# SINGLE INSTANCE CHECK
+# 3. SINGLE INSTANCE CHECK
 # ---------------------------------------------------------
+
 $MutexName = "Global\DefinitionSwitcher"
 $CreatedNew = $false
 try {
-    $Global:DefinitionSwitcherMutex = New-Object System.Threading.Mutex($true, $MutexName, [ref]$CreatedNew)
+    # Keep Mutex alive in Global scope to prevent Garbage Collection
+    $Global:AppMutex = New-Object System.Threading.Mutex($true, $MutexName, [ref]$CreatedNew)
 } catch {
     $CreatedNew = $false
 }
+
 if (-not $CreatedNew) {
-    Start-Process -FilePath $SteamExePath
+    # If already running, just bring Steam to front
+    Start-Process "steam://open/bigpicture"
     exit
 }
 
 # ---------------------------------------------------------
-# LAUNCH STEAM IF NOT RUNNING
+# 4. START SESSION (SWITCH TO 4K)
 # ---------------------------------------------------------
+
+# 1. Switch to High Res immediately (Before Steam / Games load)
+[ScreenHelper]::SetDefinition($HighResX, $HighResY)
+
+# 2. Launch Steam (if not running)
 $SteamProcess = Get-Process -Name "steam" -ErrorAction SilentlyContinue
 if ($null -eq $SteamProcess) {
-    Start-Process -FilePath $SteamExePath
-    Start-Sleep -Seconds 5
+    # Launch in Big Picture Mode (Great for TV/High Res)
+    Start-Process -FilePath $SteamExePath -ArgumentList "-bigpicture"
+    Start-Sleep -Seconds 10
+} else {
+    # If Steam is already running, force it into Big Picture to match the new 4K res
+    Start-Process "steam://open/bigpicture"
 }
 
 # ---------------------------------------------------------
-# WATCH LOOP
+# 5. WAIT FOR SESSION TO END
 # ---------------------------------------------------------
-$CurrentGame = $null
 
 while ($true) {
-    
-    # Check If Steam Running
     $SteamProcess = Get-Process -Name "steam" -ErrorAction SilentlyContinue
+    
+    # If Steam closes, we end the session
     if ($null -eq $SteamProcess) {
-        if ($CurrentGame) {
-             [ScreenHelper]::SetDefinition($NormalResX, $NormalResY)
-        }
         break 
     }
 
-    # Detect If Game Running
-    if ($null -eq $CurrentGame) {
-        $DetectedGame = Get-Process | Where-Object { 
-            try { $_.Path -like "$SteamCommonPath*" } catch { $false } 
-        } | Select-Object -First 1
-
-        if ($DetectedGame) {
-            [ScreenHelper]::SetDefinition($HighResX, $HighResY)
-            $CurrentGame = $DetectedGame
-        }
-    }
-    else {
-        if ($CurrentGame.HasExited) {
-            [ScreenHelper]::SetDefinition($NormalResX, $NormalResY)
-            $CurrentGame = $null
-        }
-    }
-
+    # Low CPU usage wait
     Start-Sleep -Seconds 3
 }
+
+# ---------------------------------------------------------
+# 6. CLEANUP (SWITCH TO 1080p)
+# ---------------------------------------------------------
+
+[ScreenHelper]::SetDefinition($NormalResX, $NormalResY)
