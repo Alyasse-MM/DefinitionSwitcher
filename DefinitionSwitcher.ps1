@@ -1,7 +1,6 @@
 # ---------------------------------------------------------
-# 1. WINDOWS API BRIDGE (C#)
+# 1. WINDOWS API BRIDGE
 # ---------------------------------------------------------
-
 $csharpSource = @"
 using System;
 using System.Runtime.InteropServices;
@@ -49,7 +48,6 @@ public class ScreenHelper {
         public int dmDisplayFrequency;
     }
 
-    // 1. Set Resolution & Fix Cursor
     public static void Set(int width, int height) {
         DEVMODE dm = new DEVMODE();
         dm.dmSize = (short)Marshal.SizeOf(dm);
@@ -60,7 +58,6 @@ public class ScreenHelper {
         SystemParametersInfo(SPI_SETCURSORS, 0, IntPtr.Zero, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE);
     }
 
-    // 2. Check if current resolution matches target
     public static bool Is(int width, int height) {
        DEVMODE dm = new DEVMODE();
        dm.dmSize = (short)Marshal.SizeOf(dm);
@@ -77,9 +74,6 @@ if (-not ("ScreenHelper" -as [type])) {
 # ---------------------------------------------------------
 # 2. CONFIGURATION
 # ---------------------------------------------------------
-
-$SteamExePath = "D:\Programmes\Steam\steam.exe"
-
 $HighResX = 2880
 $HighResY = 1620
 
@@ -87,56 +81,34 @@ $NormalResX = 1920
 $NormalResY = 1080
 
 # ---------------------------------------------------------
-# 3. SINGLE INSTANCE CHECK
+# 3. TOGGLE LOGIC
 # ---------------------------------------------------------
 
-$MutexName = "Global\DefinitionSwitcher"
-$CreatedNew = $false
-try {
-    $Global:AppMutex = New-Object System.Threading.Mutex($true, $MutexName, [ref]$CreatedNew)
-} catch {
-    $CreatedNew = $false
-}
+$CurrentPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
 
-if (-not $CreatedNew) {
-    Start-Process "steam://open/main"
+$OtherInstance = Get-Process | Where-Object { 
+    $_.Path -eq $CurrentPath -and $_.Id -ne $PID 
+} | Select-Object -First 1
+
+if ($OtherInstance) {
+    Stop-Process -InputObject $OtherInstance -Force
+    
+    [ScreenHelper]::Set($NormalResX, $NormalResY)
+    
     exit
 }
 
-# ---------------------------------------------------------
-# 4. START SESSION
-# ---------------------------------------------------------
+# CASE B: NOT RUNNING -> TURN ON
 
 [ScreenHelper]::Set($HighResX, $HighResY)
 
-$SteamProcess = Get-Process -Name "steam" -ErrorAction SilentlyContinue
-if ($null -eq $SteamProcess) {
-    Start-Process -FilePath $SteamExePath
-    Start-Sleep -Seconds 10
-} else {
-    Start-Process "steam://open/main"
-}
-
 # ---------------------------------------------------------
-# 5. ENFORCER LOOP
+# 4. ENFORCER LOOP (Runs until killed by next instance)
 # ---------------------------------------------------------
-
 while ($true) {
-    $SteamProcess = Get-Process -Name "steam" -ErrorAction SilentlyContinue
-    
-    if ($null -eq $SteamProcess) {
-        break 
-    }
-
     if (-not [ScreenHelper]::Is($HighResX, $HighResY)) {
         [ScreenHelper]::Set($HighResX, $HighResY)
     }
-
+    
     Start-Sleep -Seconds 2
 }
-
-# ---------------------------------------------------------
-# 6. CLEANUP
-# ---------------------------------------------------------
-
-[ScreenHelper]::Set($NormalResX, $NormalResY)

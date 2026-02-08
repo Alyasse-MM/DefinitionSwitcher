@@ -29,8 +29,8 @@ Source: "{$BuildDir}*"; DestDir: "{app}"; Flags: ignoreversion
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Icons]
-Name: "{group}\Steam (DefinitionSwitcher)"; Filename: "{app}\{#AppName}.exe"; IconFilename: "{code:GetSteamExeIcon}"
-Name: "{commondesktop}\Steam (DefinitionSwitcher)"; Filename: "{app}\{#AppName}.exe"; IconFilename: "{code:GetSteamExeIcon}"; Tasks: desktopicon
+Name: "{group}\{#AppName}"; Filename: "{app}\{#AppName}.exe"
+Name: "{commondesktop}\{#AppName}"; Filename: "{app}\{#AppName}.exe"; Tasks: desktopicon
 
 [Code]
 function GetSteamInstallPath(var Path: String): Boolean;
