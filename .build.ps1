@@ -18,7 +18,7 @@ $targets = @{
 # ---------------------------------------------------------
 task clean {
     Write-Build Cyan "Cleaning build directory..."
-    Remove-Item $target.DefinitionSwitcher.BuildDir -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item $targets.DefinitionSwitcher.BuildDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 task build {
@@ -67,4 +67,4 @@ task innosetup {
 }
 
 # Default
-task . InnoSetup
+task . clean, build, InnoSetup
