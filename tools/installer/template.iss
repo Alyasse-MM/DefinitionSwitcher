@@ -23,7 +23,7 @@ Compression=lzma2/max
 SolidCompression=yes
 
 [Files]
-Source: "{$BuildDir}*"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{$BuildDir}{#AppName}.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
