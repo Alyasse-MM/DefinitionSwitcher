@@ -2,11 +2,12 @@
 
 ## How to Build
 
-This project uses **Invoke-Build** and **Inno Setup** to compile and generate the installer. 
+This project uses **Invoke-Build**, **Inno Setup**, and the **PS2EXE** module to compile and package the PowerShell script.
 
 ### Prerequisites
 1. **PowerShell 7+** (`winget install Microsoft.PowerShell`)
 2. **Inno Setup** (`winget install JRSoftware.InnoSetup`)
+3. **PS2EXE Module** (to compile `.ps1` to `.exe`)
 
 ### Steps
 Make sure the **Inno Setup installation folder** (containing `ISCC.exe`) is added to your system's **PATH** environment variable.
@@ -14,13 +15,7 @@ Make sure the **Inno Setup installation folder** (containing `ISCC.exe`) is adde
 Open **PowerShell 7** in the repository root directory and run:
 
 ```powershell
-# 1. Install the task-runner framework
-Install-Module InvokeBuild -Scope CurrentUser -Force
-
-# 2. Create the required output directory
-New-Item -ItemType Directory -Name "build" -Force
-
-# 3. Run the compilation
+Install-Module ps2exe, InvokeBuild -Scope CurrentUser -Force
 Invoke-Build
 ```
 
